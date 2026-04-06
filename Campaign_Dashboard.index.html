@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google Ads Campaign Performance Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17;
+  --surface: #121a2b;
+  --surface-2: #1a2540;
+  --border: #243352;
+  --text: #e4e8f1;
+  --text-dim: #7a8baa;
+  --accent: #4fc3f7;
+  --accent-2: #7c4dff;
+  --green: #66bb6a;
+  --red: #ef5350;
+  --orange: #ffa726;
+  --yellow: #ffee58;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+.noise {
+  position: fixed; top:0; left:0; width:100%; height:100%;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0;
+}
+.glow-orb {
+  position: fixed; width: 500px; height: 500px; border-radius: 50%;
+  filter: blur(120px); opacity: 0.07; pointer-events: none; z-index: 0;
+}
+.glow-1 { top: -100px; right: -100px; background: var(--accent); }
+.glow-2 { bottom: -150px; left: -100px; background: var(--accent-2); }
+
+.container {
+  position: relative; z-index: 1;
+  max-width: 1340px; margin: 0 auto; padding: 32px 24px;
+}
+
+/* Header */
+.header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 40px; flex-wrap: wrap; gap: 16px;
+}
+.header-left h1 {
+  font-family: 'Space Mono', monospace; font-size: 28px; font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+}
+.header-left p {
+  color: var(--text-dim); font-size: 14px; margin-top: 6px;
+  font-family: 'Space Mono', monospace;
+}
+.badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.badge {
+  font-size: 11px; font-family: 'Space Mono', monospace;
+  padding: 4px 12px; border-radius: 20px;
+  border: 1px solid var(--border); color: var(--text-dim);
+  background: var(--surface);
+}
+.badge.active { border-color: var(--accent); color: var(--accent); background: rgba(79,195,247,0.08); }
+
+/* KPI Cards */
+.kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px; margin-bottom: 32px;
+}
+.kpi {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px 24px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.3s, transform 0.2s;
+}
+.kpi:hover { border-color: var(--accent); transform: translateY(-2px); }
+.kpi::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+}
+.kpi:nth-child(1)::before { background: linear-gradient(90deg, var(--accent), transparent); }
+.kpi:nth-child(2)::before { background: linear-gradient(90deg, var(--green), transparent); }
+.kpi:nth-child(3)::before { background: linear-gradient(90deg, var(--orange), transparent); }
+.kpi:nth-child(4)::before { background: linear-gradient(90deg, var(--accent-2), transparent); }
+.kpi:nth-child(5)::before { background: linear-gradient(90deg, var(--yellow), transparent); }
+.kpi:nth-child(6)::before { background: linear-gradient(90deg, var(--red), transparent); }
+.kpi-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-dim); font-family: 'Space Mono', monospace;
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 32px; font-weight: 700; font-family: 'Space Mono', monospace;
+  line-height: 1;
+}
+.kpi:nth-child(1) .kpi-value { color: var(--accent); }
+.kpi:nth-child(2) .kpi-value { color: var(--green); }
+.kpi:nth-child(3) .kpi-value { color: var(--orange); }
+.kpi:nth-child(4) .kpi-value { color: var(--accent-2); }
+.kpi:nth-child(5) .kpi-value { color: var(--yellow); }
+.kpi:nth-child(6) .kpi-value { color: var(--red); }
+.kpi-sub { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 4px; margin-bottom: 24px;
+  background: var(--surface); border-radius: 10px; padding: 4px;
+  border: 1px solid var(--border); width: fit-content;
+}
+.tab {
+  padding: 10px 20px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-family: 'Space Mono', monospace;
+  color: var(--text-dim); transition: all 0.25s; border: none; background: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  background: linear-gradient(135deg, rgba(79,195,247,0.15), rgba(124,77,255,0.15));
+  color: var(--accent); border: 1px solid rgba(79,195,247,0.3);
+}
+
+/* Chart panels */
+.panels { display: none; }
+.panels.active { display: block; }
+
+.chart-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px;
+}
+.chart-full { grid-column: 1 / -1; }
+.chart-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px;
+}
+.chart-card h3 {
+  font-family: 'Space Mono', monospace; font-size: 14px;
+  color: var(--text-dim); margin-bottom: 16px; text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.chart-wrap { position: relative; height: 320px; }
+.chart-wrap.tall { height: 400px; }
+
+/* Table */
+.table-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px; overflow-x: auto;
+}
+.table-wrap h3 {
+  font-family: 'Space Mono', monospace; font-size: 14px;
+  color: var(--text-dim); margin-bottom: 16px; text-transform: uppercase;
+  letter-spacing: 1px;
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  text-align: left; padding: 10px 14px;
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-dim); border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 10px 14px; border-bottom: 1px solid rgba(36,51,82,0.5);
+  color: var(--text); font-variant-numeric: tabular-nums;
+}
+tr:hover td { background: rgba(79,195,247,0.03); }
+.highlight { color: var(--green); font-weight: 700; }
+.warn { color: var(--orange); }
+.danger { color: var(--red); }
+
+/* Insight cards */
+.insights {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px; margin-top: 32px;
+}
+.insight {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px;
+  border-left: 3px solid var(--accent);
+}
+.insight.good { border-left-color: var(--green); }
+.insight.warn { border-left-color: var(--orange); }
+.insight.bad { border-left-color: var(--red); }
+.insight h4 {
+  font-family: 'Space Mono', monospace; font-size: 13px;
+  margin-bottom: 8px;
+}
+.insight p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+
+/* Footer */
+.footer {
+  margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border);
+  text-align: center; font-size: 12px; color: var(--text-dim);
+  font-family: 'Space Mono', monospace;
+}
+
+@media (max-width: 768px) {
+  .chart-grid { grid-template-columns: 1fr; }
+  .header h1 { font-size: 22px; }
+  .kpi-value { font-size: 24px; }
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kpi, .chart-card, .table-wrap, .insight {
+  animation: fadeUp 0.5s ease-out both;
+}
+.kpi:nth-child(2) { animation-delay: 0.05s; }
+.kpi:nth-child(3) { animation-delay: 0.1s; }
+.kpi:nth-child(4) { animation-delay: 0.15s; }
+.kpi:nth-child(5) { animation-delay: 0.2s; }
+.kpi:nth-child(6) { animation-delay: 0.25s; }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="glow-orb glow-1"></div>
+<div class="glow-orb glow-2"></div>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Google Ads Campaign Analysis</h1>
+      <p>Brave ISA — DA & DE Program | National Generic Campaigns</p>
+      <div class="badge-row">
+        <span class="badge active">Google Ads</span>
+        <span class="badge">Search Network</span>
+        <span class="badge">CAD Currency</span>
+        <span class="badge">FY23 — FY24</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Total Impressions</div>
+      <div class="kpi-value">49.6K</div>
+      <div class="kpi-sub">Across 3 campaigns</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Total Clicks</div>
+      <div class="kpi-value">967</div>
+      <div class="kpi-sub">CTR: 1.95%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Total Cost (CAD)</div>
+      <div class="kpi-value">$3,207</div>
+      <div class="kpi-sub">Avg CPC: $3.32</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Conversions</div>
+      <div class="kpi-value">73</div>
+      <div class="kpi-sub">Conv. Rate: 7.55%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Cost per Conv.</div>
+      <div class="kpi-value">$43.93</div>
+      <div class="kpi-sub">Target: <$50</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Wasted Spend</div>
+      <div class="kpi-value">$257</div>
+      <div class="kpi-sub">Near me + 0-conv groups</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="showPanel('campaign')">Campaigns</button>
+    <button class="tab" onclick="showPanel('adgroup')">Ad Groups</button>
+    <button class="tab" onclick="showPanel('keywords')">Keywords</button>
+    <button class="tab" onclick="showPanel('demographics')">Demographics</button>
+    <button class="tab" onclick="showPanel('recommendations')">Recommendations</button>
+  </div>
+
+  <!-- CAMPAIGN PANEL -->
+  <div id="panel-campaign" class="panels active">
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Campaign Performance Comparison</h3>
+        <div class="chart-wrap"><canvas id="chart-campaign-bar"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Cost Efficiency: CPC vs CPA</h3>
+        <div class="chart-wrap"><canvas id="chart-campaign-cpc-cpa"></canvas></div>
+      </div>
+      <div class="chart-card chart-full">
+        <h3>Campaign Breakdown Table</h3>
+        <table>
+          <thead>
+            <tr><th>Campaign</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Cost</th><th>Conv.</th><th>CVR</th><th>CPA</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>FY23 DA Program</td><td>13,282</td><td>391</td><td>2.94%</td><td>$1,689</td>
+              <td>31</td><td class="highlight">7.93%</td><td>$54.47</td>
+            </tr>
+            <tr>
+              <td>FY23 DA Trial 836</td><td>2,180</td><td>106</td><td class="highlight">4.86%</td><td>$307</td>
+              <td>6</td><td>5.66%</td><td>$51.10</td>
+            </tr>
+            <tr>
+              <td>FY24 DE Program</td><td>34,131</td><td>470</td><td>1.38%</td><td>$1,212</td>
+              <td>36</td><td>7.66%</td><td class="highlight">$33.66</td>
+            </tr>
+            <tr style="font-weight:700; border-top: 2px solid var(--border);">
+              <td>Total</td><td>49,593</td><td>967</td><td>1.95%</td><td>$3,207</td>
+              <td>73</td><td>7.55%</td><td>$43.93</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- AD GROUP PANEL -->
+  <div id="panel-adgroup" class="panels">
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Ad Group — Clicks & Conversions</h3>
+        <div class="chart-wrap tall"><canvas id="chart-adgroup-bar"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Ad Group — CVR vs CPA Bubble</h3>
+        <div class="chart-wrap tall"><canvas id="chart-adgroup-bubble"></canvas></div>
+      </div>
+      <div class="chart-card chart-full">
+        <h3>Ad Group Performance Table</h3>
+        <table>
+          <thead>
+            <tr><th>Ad Group</th><th>Clicks</th><th>Impr.</th><th>Conv.</th><th>Cost</th><th>CVR</th><th>CPC</th><th>CPA</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Training</td><td>657</td><td>22,154</td><td class="highlight">51.67</td><td>$2,144</td><td>7.86%</td><td>$3.26</td><td>$41.49</td></tr>
+            <tr><td>Career</td><td>158</td><td>5,464</td><td>13.33</td><td>$435</td><td class="highlight">8.44%</td><td>$2.75</td><td class="highlight">$32.63</td></tr>
+            <tr><td>BA Bootcamp</td><td>38</td><td>591</td><td>2</td><td>$163</td><td>5.26%</td><td>$4.30</td><td>$81.74</td></tr>
+            <tr><td>DA Bootcamp</td><td>48</td><td>1,059</td><td>1</td><td>$197</td><td class="warn">2.08%</td><td>$4.10</td><td class="danger">$196.57</td></tr>
+            <tr><td>Mentorship</td><td>33</td><td>985</td><td>4</td><td>$80</td><td class="highlight">12.12%</td><td>$2.42</td><td class="highlight">$20.01</td></tr>
+            <tr><td>Job Guarantee</td><td>9</td><td>213</td><td>1</td><td>$32</td><td>11.11%</td><td>$3.56</td><td>$32.01</td></tr>
+            <tr><td>Near me</td><td>24</td><td>384</td><td class="danger">0</td><td class="danger">$156</td><td class="danger">0%</td><td>$6.51</td><td class="danger">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEYWORDS PANEL -->
+  <div id="panel-keywords" class="panels">
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Top 10 Keywords by Conversions</h3>
+        <div class="chart-wrap tall"><canvas id="chart-kw-conv"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Match Type Distribution</h3>
+        <div class="chart-wrap tall"><canvas id="chart-match-type"></canvas></div>
+      </div>
+      <div class="chart-card chart-full">
+        <h3>High-Performing Keywords (Conv > 0)</h3>
+        <table>
+          <thead>
+            <tr><th>Keyword</th><th>Campaign</th><th>Impr.</th><th>Clicks</th><th>Conv.</th><th>CVR</th><th>CPA</th><th>CPC</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>data analyst online training</td><td>FY23 DA</td><td>226</td><td>11</td><td>8</td><td class="highlight">72.7%</td><td class="highlight">$5.66</td><td>$4.11</td></tr>
+            <tr><td>online data engineering courses</td><td>FY24 DE</td><td>4,231</td><td>133</td><td>7.67</td><td>5.8%</td><td>$46.93</td><td>$2.71</td></tr>
+            <tr><td>get into data engineering</td><td>FY24 DE</td><td>1,730</td><td>53</td><td>7</td><td class="highlight">13.2%</td><td class="highlight">$19.98</td><td>$2.64</td></tr>
+            <tr><td>data analyst training & placement</td><td>FY23 DA</td><td>766</td><td>34</td><td>5</td><td class="highlight">14.7%</td><td>$30.22</td><td>$4.44</td></tr>
+            <tr><td>become a data engineer</td><td>FY24 DE</td><td>2,749</td><td>78</td><td>4.33</td><td>5.6%</td><td>$48.78</td><td>$2.71</td></tr>
+            <tr><td>data analytics training</td><td>FY23 DA</td><td>1,723</td><td>67</td><td>3</td><td>4.5%</td><td class="warn">$106.40</td><td>$4.76</td></tr>
+            <tr><td>learn business analytics</td><td>FY23 DA</td><td>683</td><td>27</td><td>3</td><td class="highlight">11.1%</td><td>$37.17</td><td>$4.13</td></tr>
+            <tr><td>big data training courses</td><td>FY24 DE</td><td>2,204</td><td>40</td><td>3</td><td>7.5%</td><td>$27.85</td><td>$2.09</td></tr>
+            <tr><td>data analyst trainee</td><td>FY23 Trial</td><td>366</td><td>30</td><td>3</td><td>10.0%</td><td class="highlight">$21.25</td><td>$2.13</td></tr>
+            <tr><td>[data engineering training]</td><td>FY24 DE</td><td>426</td><td>7</td><td>3</td><td class="highlight">42.9%</td><td class="highlight">$5.82</td><td>$2.49</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEMOGRAPHICS PANEL -->
+  <div id="panel-demographics" class="panels">
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Conversions by Age Group</h3>
+        <div class="chart-wrap"><canvas id="chart-age"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Conversions by Gender</h3>
+        <div class="chart-wrap"><canvas id="chart-gender"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>CPA by Age Group</h3>
+        <div class="chart-wrap"><canvas id="chart-age-cpa"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Household Income Distribution</h3>
+        <div class="chart-wrap"><canvas id="chart-income"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECOMMENDATIONS PANEL -->
+  <div id="panel-recommendations" class="panels">
+    <div class="insights">
+      <div class="insight good">
+        <h4>Scale "Mentorship" Ad Group</h4>
+        <p>Highest CVR (12.12%) and lowest CPA ($20.01) across all ad groups. Currently only $80 in spend — significant room to scale budget while maintaining efficiency.</p>
+      </div>
+      <div class="insight good">
+        <h4>Double Down on "Get Into Data Engineering"</h4>
+        <p>13.2% CVR with $19.98 CPA — the best performing keyword in the FY24 DE campaign. Suggests strong purchase intent; consider adding exact match variants and increasing bids.</p>
+      </div>
+      <div class="insight good">
+        <h4>FY24 DE Campaign Outperforms FY23 DA</h4>
+        <p>CPA improved 38% from $54.47 (FY23) to $33.66 (FY24). The DE program keywords show stronger intent signals and lower CPCs ($2.58 vs $4.32). Continue shifting budget toward DE program.</p>
+      </div>
+      <div class="insight warn">
+        <h4>Investigate "data analyst online training" Anomaly</h4>
+        <p>72.7% CVR is exceptionally high (8 conversions from 11 clicks). Verify conversion tracking is correct. If valid, this is a goldmine keyword — aggressively expand it.</p>
+      </div>
+      <div class="insight warn">
+        <h4>Target 25–34 Age Group More Aggressively</h4>
+        <p>This cohort drives 53% of all conversions (39 of 73) with the best CPA at $32.89. Apply bid adjustments to increase share for this demographic.</p>
+      </div>
+      <div class="insight warn">
+        <h4>Optimize Match Types</h4>
+        <p>Exact match keywords in FY24 DE show 42.9% CVR with $5.82 CPA vs Broad match at 6.8% CVR. Shift budget from broad to exact/phrase match for converting keywords.</p>
+      </div>
+      <div class="insight bad">
+        <h4>Pause "Near me (location)" Ad Group</h4>
+        <p>$156.30 spent with zero conversions. Highest CPC ($6.51) across all groups. Location-based queries aren't converting — reallocate this budget immediately.</p>
+      </div>
+      <div class="insight bad">
+        <h4>Pause "DA Bootcamp" Ad Group</h4>
+        <p>CPA of $196.57 is 4.5x the average. Only 1 conversion from $197 in spend. The "bootcamp" framing for DA doesn't resonate with this audience.</p>
+      </div>
+      <div class="insight bad">
+        <h4>Cut Non-Converting Keywords</h4>
+        <p>~35 keywords received impressions but zero clicks or conversions, wasting budget on irrelevant traffic. Implement negative keywords for "security analyst", "comptia", "power bi service" to refine targeting.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Built with Google Ads data extraction, SQL transformation & BI analysis &mdash; Portfolio Project
+  </div>
+</div>
+
+<script>
+// Common chart config
+Chart.defaults.color = '#7a8baa';
+Chart.defaults.borderColor = 'rgba(36,51,82,0.5)';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+const COLORS = {
+  accent: '#4fc3f7', accent2: '#7c4dff', green: '#66bb6a',
+  orange: '#ffa726', red: '#ef5350', yellow: '#ffee58',
+  surface: 'rgba(26,37,64,0.8)'
+};
+
+// Tab switching
+function showPanel(name) {
+  document.querySelectorAll('.panels').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.target.classList.add('active');
+
+  // Lazy init charts
+  if (name === 'campaign') initCampaignCharts();
+  if (name === 'adgroup') initAdGroupCharts();
+  if (name === 'keywords') initKeywordCharts();
+  if (name === 'demographics') initDemoCharts();
+}
+
+let initialized = { campaign: false, adgroup: false, keywords: false, demographics: false };
+
+function initCampaignCharts() {
+  if (initialized.campaign) return;
+  initialized.campaign = true;
+
+  new Chart(document.getElementById('chart-campaign-bar'), {
+    type: 'bar',
+    data: {
+      labels: ['FY23 DA Program', 'FY23 DA Trial', 'FY24 DE Program'],
+      datasets: [
+        { label: 'Impressions (÷100)', data: [132.82, 21.80, 341.31], backgroundColor: COLORS.accent + '99', borderRadius: 6 },
+        { label: 'Clicks', data: [391, 106, 470], backgroundColor: COLORS.green + '99', borderRadius: 6 },
+        { label: 'Conversions (×10)', data: [310, 60, 360], backgroundColor: COLORS.accent2 + '99', borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } } },
+      scales: { y: { grid: { color: 'rgba(36,51,82,0.3)' } }, x: { grid: { display: false } } }
+    }
+  });
+
+  new Chart(document.getElementById('chart-campaign-cpc-cpa'), {
+    type: 'bar',
+    data: {
+      labels: ['FY23 DA Program', 'FY23 DA Trial', 'FY24 DE Program'],
+      datasets: [
+        { label: 'Avg CPC ($)', data: [4.32, 2.89, 2.58], backgroundColor: COLORS.orange + '99', borderRadius: 6 },
+        { label: 'CPA ($)', data: [54.47, 51.10, 33.66], backgroundColor: COLORS.red + '99', borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } } },
+      scales: { y: { grid: { color: 'rgba(36,51,82,0.3)' }, title: { display: true, text: 'CAD ($)' } }, x: { grid: { display: false } } }
+    }
+  });
+}
+
+function initAdGroupCharts() {
+  if (initialized.adgroup) return;
+  initialized.adgroup = true;
+
+  const groups = ['Training', 'Career', 'DA Bootcamp', 'BA Bootcamp', 'Mentorship', 'Near me', 'Job Guar.'];
+
+  new Chart(document.getElementById('chart-adgroup-bar'), {
+    type: 'bar',
+    data: {
+      labels: groups,
+      datasets: [
+        { label: 'Clicks', data: [657, 158, 48, 38, 33, 24, 9], backgroundColor: COLORS.accent + '99', borderRadius: 4 },
+        { label: 'Conversions', data: [51.67, 13.33, 1, 2, 4, 0, 1], backgroundColor: COLORS.green + '99', borderRadius: 4 }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true } } },
+      scales: { x: { grid: { color: 'rgba(36,51,82,0.3)' } }, y: { grid: { display: false } } }
+    }
+  });
+
+  new Chart(document.getElementById('chart-adgroup-bubble'), {
+    type: 'bubble',
+    data: {
+      datasets: [
+        { label: 'Training', data: [{ x: 7.86, y: 41.49, r: 20 }], backgroundColor: COLORS.accent + '99' },
+        { label: 'Career', data: [{ x: 8.44, y: 32.63, r: 12 }], backgroundColor: COLORS.green + '99' },
+        { label: 'Mentorship', data: [{ x: 12.12, y: 20.01, r: 8 }], backgroundColor: COLORS.accent2 + '99' },
+        { label: 'BA Bootcamp', data: [{ x: 5.26, y: 81.74, r: 6 }], backgroundColor: COLORS.orange + '99' },
+        { label: 'DA Bootcamp', data: [{ x: 2.08, y: 196.57, r: 5 }], backgroundColor: COLORS.red + '99' },
+        { label: 'Job Guarantee', data: [{ x: 11.11, y: 32.01, r: 4 }], backgroundColor: COLORS.yellow + '99' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { title: { display: true, text: 'CVR (%)' }, grid: { color: 'rgba(36,51,82,0.3)' } },
+        y: { title: { display: true, text: 'CPA ($)' }, grid: { color: 'rgba(36,51,82,0.3)' } }
+      },
+      plugins: { legend: { position: 'right', labels: { usePointStyle: true, padding: 12 } } }
+    }
+  });
+}
+
+function initKeywordCharts() {
+  if (initialized.keywords) return;
+  initialized.keywords = true;
+
+  new Chart(document.getElementById('chart-kw-conv'), {
+    type: 'bar',
+    data: {
+      labels: ['online training', 'online DE courses', 'get into DE', 'DA training+place', 'become DE', 'DA training', 'learn BA', 'big data courses', 'DA trainee', '[DE training]'],
+      datasets: [{
+        label: 'Conversions',
+        data: [8, 7.67, 7, 5, 4.33, 3, 3, 3, 3, 3],
+        backgroundColor: [COLORS.green, COLORS.accent, COLORS.accent, COLORS.accent2, COLORS.accent, COLORS.accent2, COLORS.accent2, COLORS.accent, COLORS.orange, COLORS.accent].map(c => c + '99'),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { color: 'rgba(36,51,82,0.3)' } }, y: { grid: { display: false } } }
+    }
+  });
+
+  new Chart(document.getElementById('chart-match-type'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Broad Match', 'Exact Match', 'Phrase Match'],
+      datasets: [{
+        data: [29299, 779, 491],
+        backgroundColor: [COLORS.accent + 'cc', COLORS.green + 'cc', COLORS.accent2 + 'cc'],
+        borderWidth: 0, hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
+      }
+    }
+  });
+}
+
+function initDemoCharts() {
+  if (initialized.demographics) return;
+  initialized.demographics = true;
+
+  new Chart(document.getElementById('chart-age'), {
+    type: 'bar',
+    data: {
+      labels: ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Unknown'],
+      datasets: [
+        { label: 'Conversions', data: [12, 39, 14, 0, 0, 0, 8], backgroundColor: COLORS.accent + '99', borderRadius: 4 },
+        { label: 'Clicks', data: [139, 397, 208, 8, 3, 0, 212], backgroundColor: COLORS.accent2 + '44', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true } } },
+      scales: { y: { grid: { color: 'rgba(36,51,82,0.3)' } }, x: { grid: { display: false } } }
+    }
+  });
+
+  new Chart(document.getElementById('chart-gender'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Male (37 conv)', 'Female (28 conv)', 'Unknown (8 conv)'],
+      datasets: [{
+        data: [37, 28, 8],
+        backgroundColor: [COLORS.accent + 'cc', COLORS.accent2 + 'cc', COLORS.orange + '88'],
+        borderWidth: 0, hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 16 } } }
+    }
+  });
+
+  new Chart(document.getElementById('chart-age-cpa'), {
+    type: 'line',
+    data: {
+      labels: ['18-24', '25-34', '35-44'],
+      datasets: [{
+        label: 'CPA ($)',
+        data: [42.76, 32.89, 56.58],
+        borderColor: COLORS.orange, backgroundColor: COLORS.orange + '22',
+        fill: true, tension: 0.4, pointRadius: 6, pointBackgroundColor: COLORS.orange
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { grid: { color: 'rgba(36,51,82,0.3)' }, title: { display: true, text: 'CPA ($)' } }, x: { grid: { display: false } } }
+    }
+  });
+
+  new Chart(document.getElementById('chart-income'), {
+    type: 'bar',
+    data: {
+      labels: ['Top 10%', '11-20%', '21-30%', '31-40%', '41-50%', 'Lower 50%', 'Unknown'],
+      datasets: [
+        { label: 'Conversions', data: [9, 10, 1, 5, 6, 31, 11], backgroundColor: COLORS.green + '99', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true } } },
+      scales: { y: { grid: { color: 'rgba(36,51,82,0.3)' } }, x: { grid: { display: false } } }
+    }
+  });
+}
+
+// Initialize first panel
+initCampaignCharts();
+</script>
+</body>
+</html>
